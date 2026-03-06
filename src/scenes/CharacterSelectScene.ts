@@ -1,9 +1,19 @@
 import Phaser from 'phaser';
 import { CHARACTERS } from '../characters/CharacterData';
 import type { CharacterDef } from '../characters/CharacterData';
+import { UI_FONT_FAMILY } from '../ui/Typography';
 
 export class CharacterSelectScene extends Phaser.Scene {
   private selectingPlayer: 1 | 2 = 1;
+  private playerLabel!: Phaser.GameObjects.Text;
+  private cardContainer!: Phaser.GameObjects.Container;
+  private scrollViewportTop = 0;
+  private scrollViewportHeight = 0;
+  private scrollOffset = 0;
+  private maxScrollOffset = 0;
+  private pointerScrollActive = false;
+  private dragStartY = 0;
+  private dragStartOffset = 0;
 
   constructor() {
     super({ key: 'CharacterSelectScene' });
@@ -12,6 +22,8 @@ export class CharacterSelectScene extends Phaser.Scene {
   create(): void {
     const { width, height } = this.scale;
     this.selectingPlayer = 1;
+    this.scrollOffset = 0;
+    this.maxScrollOffset = 0;
 
     // Background
     const bg = this.add.graphics();
@@ -20,44 +32,154 @@ export class CharacterSelectScene extends Phaser.Scene {
 
     // Header
     this.add.text(width / 2, 40, 'Pick Your Fighter!', {
-      fontFamily: '"Fredoka", "Comic Sans MS", cursive',
-      fontSize: '36px',
+      fontFamily: UI_FONT_FAMILY,
+      fontSize: width < 420 ? '30px' : '36px',
       color: '#f5d442',
       stroke: '#000000',
       strokeThickness: 6,
     }).setOrigin(0.5);
 
     // Player indicator
-    const playerLabel = this.add.text(width / 2, 80, 'Player 1 — Choose!', {
-      fontFamily: '"Fredoka", "Comic Sans MS", cursive',
+    this.playerLabel = this.add.text(width / 2, 82, 'Player 1 — Choose!', {
+      fontFamily: UI_FONT_FAMILY,
       fontSize: '22px',
       color: '#2ecc71',
       stroke: '#000000',
       strokeThickness: 3,
     }).setOrigin(0.5);
 
-    // Character cards — lay out in a grid for all characters
-    const cardW = 120;
-    const cardH = 180;
-    const gap = 14;
-    const cols = 5;
-    const totalGridW = cols * cardW + (cols - 1) * gap;
-    const startX = (width - totalGridW) / 2 + cardW / 2;
-    const startY = height * 0.35;
+    this.scrollViewportTop = 118;
+    this.scrollViewportHeight = Math.max(180, height - this.scrollViewportTop - 92);
+
+    const viewportBg = this.add.graphics();
+    viewportBg.fillStyle(0x081320, 0.2);
+    viewportBg.fillRoundedRect(12, this.scrollViewportTop, width - 24, this.scrollViewportHeight, 18);
+    viewportBg.lineStyle(1.5, 0xffffff, 0.08);
+    viewportBg.strokeRoundedRect(12, this.scrollViewportTop, width - 24, this.scrollViewportHeight, 18);
+
+    const scrollContainer = this.add.container(0, 0);
+    this.cardContainer = this.add.container(0, this.scrollViewportTop);
+    scrollContainer.add(this.cardContainer);
+
+    const maskGraphics = this.add.graphics();
+    maskGraphics.setVisible(false);
+    maskGraphics.fillStyle(0xffffff);
+    maskGraphics.fillRoundedRect(12, this.scrollViewportTop, width - 24, this.scrollViewportHeight, 18);
+    scrollContainer.setMask(maskGraphics.createGeometryMask());
+
+    this.layoutCards(width);
+
+    this.add.text(width / 2, height - 72, 'Swipe to scroll', {
+      fontFamily: UI_FONT_FAMILY,
+      fontSize: '16px',
+      color: '#dfe9ff',
+      stroke: '#000000',
+      strokeThickness: 3,
+    }).setOrigin(0.5).setVisible(this.maxScrollOffset > 0);
+
+    this.setupScrollInput();
+
+    // Back button
+    this.createSmallButton(80, height - 50, '← Back', () => {
+      this.scene.start('TitleScene');
+    });
+  }
+
+  private layoutCards(width: number): void {
+    const sidePadding = 22;
+    const gap = Phaser.Math.Clamp(Math.round(width * 0.025), 12, 18);
+    const availableWidth = width - sidePadding * 2;
+    const minCardWidth = width < 420 ? 132 : 140;
+    const cols = Phaser.Math.Clamp(
+      Math.floor((availableWidth + gap) / (minCardWidth + gap)),
+      2,
+      5,
+    );
+    const cardW = Math.floor((availableWidth - gap * (cols - 1)) / cols);
+    const cardH = Phaser.Math.Clamp(Math.round(cardW * 1.38), 176, 210);
     const rowGap = 16;
+    const topPadding = 10;
+    const bottomPadding = 18;
+    const rows = Math.ceil(CHARACTERS.length / cols);
+    const gridWidth = cols * cardW + (cols - 1) * gap;
+    const startX = (width - gridWidth) / 2 + cardW / 2;
+    const startY = topPadding + cardH / 2;
 
     CHARACTERS.forEach((charDef, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
       const cx = startX + col * (cardW + gap);
       const cy = startY + row * (cardH + rowGap);
-      this.createCharCard(cx, cy, cardW, cardH, charDef, playerLabel);
+      this.createCharCard(cx, cy, cardW, cardH, charDef, this.playerLabel);
     });
 
-    // Back button
-    this.createSmallButton(80, height - 50, '← Back', () => {
-      this.scene.start('TitleScene');
+    const contentHeight = topPadding + rows * cardH + (rows - 1) * rowGap + bottomPadding;
+    this.maxScrollOffset = Math.max(0, contentHeight - this.scrollViewportHeight);
+    this.setScrollOffset(0);
+  }
+
+  private setupScrollInput(): void {
+    const onPointerDown = (pointer: Phaser.Input.Pointer) => {
+      if (!this.maxScrollOffset || !this.isInScrollViewport(pointer.x, pointer.y)) {
+        return;
+      }
+
+      this.pointerScrollActive = true;
+      this.dragStartY = pointer.y;
+      this.dragStartOffset = this.scrollOffset;
+    };
+
+    const onPointerMove = (pointer: Phaser.Input.Pointer) => {
+      if (!this.pointerScrollActive || !pointer.isDown) {
+        return;
+      }
+
+      const deltaY = pointer.y - this.dragStartY;
+      this.setScrollOffset(this.dragStartOffset - deltaY);
+    };
+
+    const stopScroll = () => {
+      this.pointerScrollActive = false;
+    };
+
+    const onWheel = (
+      pointer: Phaser.Input.Pointer,
+      _gameObjects: Phaser.GameObjects.GameObject[],
+      _deltaX: number,
+      deltaY: number,
+    ) => {
+      if (!this.maxScrollOffset || !this.isInScrollViewport(pointer.x, pointer.y)) {
+        return;
+      }
+
+      this.setScrollOffset(this.scrollOffset + deltaY * 0.8);
+    };
+
+    this.input.on('pointerdown', onPointerDown);
+    this.input.on('pointermove', onPointerMove);
+    this.input.on('pointerup', stopScroll);
+    this.input.on('gameout', stopScroll);
+    this.input.on('wheel', onWheel);
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.off('pointerdown', onPointerDown);
+      this.input.off('pointermove', onPointerMove);
+      this.input.off('pointerup', stopScroll);
+      this.input.off('gameout', stopScroll);
+      this.input.off('wheel', onWheel);
     });
+  }
+
+  private isInScrollViewport(x: number, y: number): boolean {
+    return x >= 12
+      && x <= this.scale.width - 12
+      && y >= this.scrollViewportTop
+      && y <= this.scrollViewportTop + this.scrollViewportHeight;
+  }
+
+  private setScrollOffset(offset: number): void {
+    this.scrollOffset = Phaser.Math.Clamp(offset, 0, this.maxScrollOffset);
+    this.cardContainer.y = this.scrollViewportTop - this.scrollOffset;
   }
 
   private createCharCard(
@@ -70,37 +192,47 @@ export class CharacterSelectScene extends Phaser.Scene {
     g.fillRoundedRect(x - w / 2, y - h / 2, w, h, 14);
     g.lineStyle(2, charDef.color, 0.8);
     g.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 14);
+    this.cardContainer.add(g);
 
     // Character sprite from loaded SVG
     const sprite = this.add.image(x, y - 28, charDef.spriteKey);
-    sprite.setDisplaySize(70, 78);
+    sprite.setDisplaySize(Math.round(w * 0.55), Math.round(h * 0.42));
+    this.cardContainer.add(sprite);
 
     // Name
-    this.add.text(x, y + 25, charDef.name, {
-      fontFamily: '"Fredoka", "Comic Sans MS", cursive',
-      fontSize: '18px',
+    const nameText = this.add.text(x, y + h * 0.14, charDef.name, {
+      fontFamily: UI_FONT_FAMILY,
+      fontSize: w < 150 ? '18px' : '20px',
       color: '#ffffff',
       stroke: '#000',
       strokeThickness: 3,
     }).setOrigin(0.5);
+    this.cardContainer.add(nameText);
 
     // Stats preview
-    this.add.text(x, y + 52, `HP ${charDef.hp}  ⚔${charDef.attackPower}  ✨${charDef.specialPower}`, {
-      fontFamily: '"Fredoka", cursive',
-      fontSize: '11px',
+    const statsText = this.add.text(x, y + h * 0.3, `HP ${charDef.hp}   ⚔ ${charDef.attackPower}   ✨ ${charDef.specialPower}`, {
+      fontFamily: UI_FONT_FAMILY,
+      fontSize: w < 150 ? '12px' : '13px',
       color: '#aaaacc',
+      align: 'center',
     }).setOrigin(0.5);
+    this.cardContainer.add(statsText);
 
     // Hit area
     const hitArea = this.add.rectangle(x, y, w, h)
       .setInteractive({ useHandCursor: true })
       .setOrigin(0.5)
       .setAlpha(0.001);
+    this.cardContainer.add(hitArea);
 
-    hitArea.on('pointerdown', () => {
+    hitArea.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (pointer.getDistance() > 10) {
+        return;
+      }
+
       // Bounce
       this.tweens.add({
-        targets: [g, sprite],
+        targets: [g, sprite, nameText, statsText],
         scaleX: 0.93,
         scaleY: 0.93,
         duration: 80,
@@ -138,7 +270,7 @@ export class CharacterSelectScene extends Phaser.Scene {
 
   private createSmallButton(x: number, y: number, label: string, onClick: () => void): void {
     const txt = this.add.text(x, y, label, {
-      fontFamily: '"Fredoka", "Comic Sans MS", cursive',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: '20px',
       color: '#aaaaaa',
       stroke: '#000',

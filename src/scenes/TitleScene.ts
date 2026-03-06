@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { UI_FONT_FAMILY } from '../ui/Typography';
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -29,7 +30,7 @@ export class TitleScene extends Phaser.Scene {
 
     // Title
     const title = this.add.text(width / 2, height * 0.22, '⚔️ Pokémon Brawl ⚔️', {
-      fontFamily: '"Fredoka", "Comic Sans MS", cursive',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: '52px',
       color: '#f5d442',
       stroke: '#000000',
@@ -49,7 +50,7 @@ export class TitleScene extends Phaser.Scene {
 
     // Subtitle
     this.add.text(width / 2, height * 0.36, 'Choose your fighter!', {
-      fontFamily: '"Fredoka", "Comic Sans MS", cursive',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: '24px',
       color: '#ffffff',
       stroke: '#000000',
@@ -80,7 +81,7 @@ export class TitleScene extends Phaser.Scene {
     g.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 20);
 
     const txt = this.add.text(x, y, label, {
-      fontFamily: '"Fredoka", "Comic Sans MS", cursive',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: '30px',
       color: '#ffffff',
       stroke: '#000000',

@@ -6,6 +6,7 @@ import { AIController } from '../battle/AIController';
 import { HPBar } from '../ui/HPBar';
 import { ActionButton, drawActionBarPanel } from '../ui/ActionButtons';
 import type { ActionType } from '../ui/ActionButtons';
+import { UI_FONT_FAMILY } from '../ui/Typography';
 import { randomBackground } from '../backgrounds/BackgroundConfig';
 import { drawMedievalArena } from '../backgrounds/ProceduralBackgrounds';
 import { spawnAttackEffect } from '../battle/AttackEffects';
@@ -64,7 +65,7 @@ export class BattleScene extends Phaser.Scene {
 
     // -------- Turn indicator --------
     this.turnText = this.add.text(width / 2, 38, 'Turn 1', {
-      fontFamily: '"Fredoka", cursive',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: '20px',
       color: '#ffffff',
       stroke: '#000',
@@ -73,7 +74,7 @@ export class BattleScene extends Phaser.Scene {
 
     // -------- Current player label --------
     this.currentPlayerLabel = this.add.text(width / 2, height * 0.6, 'Your Turn!', {
-      fontFamily: '"Fredoka", "Comic Sans MS", cursive',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: '26px',
       color: '#f5d442',
       stroke: '#000000',
@@ -82,7 +83,7 @@ export class BattleScene extends Phaser.Scene {
 
     // -------- Message text --------
     this.messageText = this.add.text(width / 2, height * 0.67, '', {
-      fontFamily: '"Fredoka", "Comic Sans MS", cursive',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: '20px',
       color: '#ffffff',
       stroke: '#000',
@@ -94,10 +95,18 @@ export class BattleScene extends Phaser.Scene {
     drawActionBarPanel(this);
 
     // -------- Action buttons --------
-    const btnY = height * 0.84;
-    const btnW = 150;
-    const btnH = 90;
-    const btnGap = 24;
+    const compactButtons = width < 520;
+    const sidePadding = compactButtons ? 14 : 28;
+    const btnGap = compactButtons ? 10 : 24;
+    const maxButtonWidth = compactButtons ? 116 : 150;
+    const btnW = Math.min(
+      maxButtonWidth,
+      Math.floor((width - sidePadding * 2 - btnGap * 2) / 3),
+    );
+    const btnH = compactButtons
+      ? Phaser.Math.Clamp(Math.round(btnW * 0.72), 70, 82)
+      : 90;
+    const btnY = height - btnH / 2 - (compactButtons ? 18 : 26);
     const totalBtnW = 3 * btnW + 2 * btnGap;
     const btnStartX = (width - totalBtnW) / 2 + btnW / 2;
 
@@ -450,7 +459,7 @@ export class BattleScene extends Phaser.Scene {
     const size = isSpecial ? '38px' : '30px';
     const prefix = isSpecial ? '💥 ' : '';
     const txt = this.add.text(x, y, `${prefix}-${damage}`, {
-      fontFamily: '"Fredoka", "Comic Sans MS", cursive',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: size,
       color,
       stroke: '#000000',
@@ -569,7 +578,7 @@ export class BattleScene extends Phaser.Scene {
     const emoji = winner === 'p1' || this.mode === '2p' ? '🏆' : '😢';
 
     const winText = this.add.text(width / 2, height * 0.3, `${emoji} ${winnerLabel} Wins! ${emoji}`, {
-      fontFamily: '"Fredoka", "Comic Sans MS", cursive',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: '44px',
       color: '#f5d442',
       stroke: '#000',
@@ -585,7 +594,7 @@ export class BattleScene extends Phaser.Scene {
 
     // Character showcase
     this.add.text(width / 2, height * 0.48, `${winnerChar.emoji} ${winnerChar.name} ${winnerChar.emoji}`, {
-      fontFamily: '"Fredoka", cursive',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: '32px',
       color: '#ffffff',
       stroke: '#000',
@@ -604,7 +613,7 @@ export class BattleScene extends Phaser.Scene {
     btnG.strokeRoundedRect(btnX - btnW / 2, btnY - btnH / 2, btnW, btnH, 18);
 
     this.add.text(btnX, btnY, '🔄  Play Again', {
-      fontFamily: '"Fredoka", "Comic Sans MS", cursive',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: '26px',
       color: '#ffffff',
       stroke: '#000',
@@ -623,7 +632,7 @@ export class BattleScene extends Phaser.Scene {
 
     // Home button
     const homeTxt = this.add.text(width / 2, height * 0.82, '🏠 Home', {
-      fontFamily: '"Fredoka", cursive',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: '20px',
       color: '#aaaaaa',
       stroke: '#000',

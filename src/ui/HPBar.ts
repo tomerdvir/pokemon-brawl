@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { UI_FONT_FAMILY } from './Typography';
 
 /**
  * Animated HP bar drawn with Phaser Graphics.
@@ -35,7 +36,7 @@ export class HPBar {
 
     this.bar = scene.add.graphics();
     this.label = scene.add.text(x, y - 28, name, {
-      fontFamily: '"Fredoka", "Comic Sans MS", cursive',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: '22px',
       color: '#ffffff',
       stroke: '#000000',
@@ -44,7 +45,7 @@ export class HPBar {
 
     // Numeric HP display
     this.hpText = scene.add.text(x + width / 2, y + height / 2, `${maxHP}/${maxHP}`, {
-      fontFamily: '"Fredoka", "Comic Sans MS", cursive',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: '14px',
       color: '#ffffff',
       stroke: '#000000',

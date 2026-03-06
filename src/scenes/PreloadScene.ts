@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BATTLE_BACKGROUNDS } from '../backgrounds/BackgroundConfig';
 import { CHARACTERS } from '../characters/CharacterData';
+import { UI_FONT_FAMILY } from '../ui/Typography';
 
 /**
  * Loads all background images, character sprites, and other shared assets.
@@ -25,7 +26,7 @@ export class PreloadScene extends Phaser.Scene {
     bg.fillRect(0, 0, width, height);
 
     this.add.text(width / 2, barY - 40, 'Loading…', {
-      fontFamily: '"Fredoka", "Comic Sans MS", cursive',
+      fontFamily: UI_FONT_FAMILY,
       fontSize: '24px',
       color: '#f5d442',
       stroke: '#000000',

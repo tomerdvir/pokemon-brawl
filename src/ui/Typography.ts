@@ -1,0 +1,1 @@
+export const UI_FONT_FAMILY = '"Avenir Next", "Segoe UI", "Trebuchet MS", Arial, sans-serif';
