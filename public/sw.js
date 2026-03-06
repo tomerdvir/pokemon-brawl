@@ -1,9 +1,10 @@
 // Minimal service worker for offline PWA support
 const CACHE_NAME = 'pokebrawl-v1';
+const APP_BASE_PATH = new URL('./', self.location.href).pathname;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(['/']))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll([APP_BASE_PATH]))
   );
 });
 
