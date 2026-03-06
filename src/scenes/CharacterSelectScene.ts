@@ -14,16 +14,46 @@ export class CharacterSelectScene extends Phaser.Scene {
   private pointerScrollActive = false;
   private dragStartY = 0;
   private dragStartOffset = 0;
+  private scrollListeners: (() => void) | null = null;
+  private readonly handleResize = () => {
+    this.rebuildUI();
+  };
 
   constructor() {
     super({ key: 'CharacterSelectScene' });
   }
 
   create(): void {
-    const { width, height } = this.scale;
     this.selectingPlayer = 1;
     this.scrollOffset = 0;
     this.maxScrollOffset = 0;
+
+    this.rebuildUI();
+
+    this.scale.on('resize', this.handleResize);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off('resize', this.handleResize);
+    });
+  }
+
+  private rebuildUI(): void {
+    const savedPlayer = this.selectingPlayer;
+
+    // Clean up old scroll listeners
+    if (this.scrollListeners) {
+      this.scrollListeners();
+      this.scrollListeners = null;
+    }
+
+    this.children.removeAll(true);
+    this.tweens.killAll();
+    this.scrollOffset = 0;
+    this.maxScrollOffset = 0;
+
+    this.selectingPlayer = savedPlayer;
+
+    const { width, height } = this.scale;
+    const isLandscape = width > height && height < 500;
 
     // Background
     const bg = this.add.graphics();
@@ -31,25 +61,32 @@ export class CharacterSelectScene extends Phaser.Scene {
     bg.fillRect(0, 0, width, height);
 
     // Header
-    this.add.text(width / 2, 40, 'Pick Your Fighter!', {
+    const headerY = isLandscape ? 22 : 40;
+    const headerSize = isLandscape ? '24px' : (width < 420 ? '30px' : '36px');
+    this.add.text(width / 2, headerY, 'Pick Your Fighter!', {
       fontFamily: UI_FONT_FAMILY,
-      fontSize: width < 420 ? '30px' : '36px',
+      fontSize: headerSize,
       color: '#f5d442',
       stroke: '#000000',
       strokeThickness: 6,
     }).setOrigin(0.5);
 
     // Player indicator
-    this.playerLabel = this.add.text(width / 2, 82, 'Player 1 — Choose!', {
+    const labelY = isLandscape ? 50 : 82;
+    const labelSize = isLandscape ? '18px' : '22px';
+    const labelColor = savedPlayer === 2 ? '#3498db' : '#2ecc71';
+    const labelStr = savedPlayer === 2 ? 'Player 2 — Choose!' : 'Player 1 — Choose!';
+    this.playerLabel = this.add.text(width / 2, labelY, labelStr, {
       fontFamily: UI_FONT_FAMILY,
-      fontSize: '22px',
-      color: '#2ecc71',
+      fontSize: labelSize,
+      color: labelColor,
       stroke: '#000000',
       strokeThickness: 3,
     }).setOrigin(0.5);
 
-    this.scrollViewportTop = 118;
-    this.scrollViewportHeight = Math.max(180, height - this.scrollViewportTop - 92);
+    this.scrollViewportTop = isLandscape ? 68 : 118;
+    const footerSpace = isLandscape ? 48 : 92;
+    this.scrollViewportHeight = Math.max(120, height - this.scrollViewportTop - footerSpace);
 
     const viewportBg = this.add.graphics();
     viewportBg.fillStyle(0x081320, 0.2);
@@ -69,9 +106,9 @@ export class CharacterSelectScene extends Phaser.Scene {
 
     this.layoutCards(width);
 
-    this.add.text(width / 2, height - 72, 'Swipe to scroll', {
+    this.add.text(width / 2, height - (isLandscape ? 30 : 72), 'Swipe to scroll', {
       fontFamily: UI_FONT_FAMILY,
-      fontSize: '16px',
+      fontSize: isLandscape ? '13px' : '16px',
       color: '#dfe9ff',
       stroke: '#000000',
       strokeThickness: 3,
@@ -80,23 +117,27 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.setupScrollInput();
 
     // Back button
-    this.createSmallButton(80, height - 50, '← Back', () => {
+    this.createSmallButton(80, height - (isLandscape ? 26 : 50), '← Back', () => {
       this.scene.start('TitleScene');
     });
   }
 
   private layoutCards(width: number): void {
+    const { height } = this.scale;
+    const isLandscape = width > height && height < 500;
     const sidePadding = 22;
     const gap = Phaser.Math.Clamp(Math.round(width * 0.025), 12, 18);
     const availableWidth = width - sidePadding * 2;
-    const minCardWidth = width < 420 ? 132 : 140;
+    const minCardWidth = isLandscape ? 110 : (width < 420 ? 132 : 140);
     const cols = Phaser.Math.Clamp(
       Math.floor((availableWidth + gap) / (minCardWidth + gap)),
       2,
-      5,
+      isLandscape ? 6 : 5,
     );
     const cardW = Math.floor((availableWidth - gap * (cols - 1)) / cols);
-    const cardH = Phaser.Math.Clamp(Math.round(cardW * 1.38), 176, 210);
+    const cardH = isLandscape
+      ? Phaser.Math.Clamp(Math.round(cardW * 1.2), 130, 170)
+      : Phaser.Math.Clamp(Math.round(cardW * 1.38), 176, 210);
     const rowGap = 16;
     const topPadding = 10;
     const bottomPadding = 18;
@@ -161,13 +202,17 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.input.on('gameout', stopScroll);
     this.input.on('wheel', onWheel);
 
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+    const cleanup = () => {
       this.input.off('pointerdown', onPointerDown);
       this.input.off('pointermove', onPointerMove);
       this.input.off('pointerup', stopScroll);
       this.input.off('gameout', stopScroll);
       this.input.off('wheel', onWheel);
-    });
+    };
+
+    this.scrollListeners = cleanup;
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, cleanup);
   }
 
   private isInScrollViewport(x: number, y: number): boolean {

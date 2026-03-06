@@ -268,7 +268,9 @@ export class ActionButton {
 
 export function drawActionBarPanel(scene: Phaser.Scene): Phaser.GameObjects.Graphics {
   const { width, height } = scene.scale;
-  const panelH = width < 520 ? 96 : 130;
+  const isPortrait = height > width;
+  const smallLandscape = !isPortrait && height < 450;
+  const panelH = smallLandscape ? 80 : (width < 520 ? 96 : 130);
   const panelY = height - panelH;
   const g = scene.add.graphics();
 

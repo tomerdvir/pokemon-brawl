@@ -169,6 +169,7 @@ export class BattleScene extends Phaser.Scene {
     const isPortrait = height > width;
     const compact = width < 520;
     const panelHeight = compact ? 96 : 130;
+    const smallLandscape = !isPortrait && height < 450;
 
     let arenaTop: number;
     let arenaBottom: number;
@@ -184,20 +185,33 @@ export class BattleScene extends Phaser.Scene {
       // Derive arenaBottom from status label position
       const statusBaseY = height - (compact ? 160 : 205);
       arenaBottom = statusBaseY - 12;
+    } else if (smallLandscape) {
+      // Phone landscape: compact top, tight bottom
+      arenaTop = 62;
+      arenaBottom = height - panelHeight - 20;
     } else {
       arenaTop = 132;
       arenaBottom = height - panelHeight - 98;
     }
 
-    const fallbackCenterY = height * (isPortrait ? 0.48 : 0.44);
+    const fallbackCenterY = height * (isPortrait ? 0.48 : 0.36);
     const centerY = arenaBottom > arenaTop
       ? (arenaTop + arenaBottom) / 2
       : fallbackCenterY;
 
+    let scale: number;
+    if (isPortrait) {
+      scale = 0.88;
+    } else if (smallLandscape) {
+      scale = Phaser.Math.Clamp(height / 520, 0.52, 0.78);
+    } else {
+      scale = 1;
+    }
+
     return {
       p1: { x: width * (isPortrait ? 0.28 : 0.25), y: centerY },
       p2: { x: width * (isPortrait ? 0.72 : 0.75), y: centerY },
-      scale: isPortrait ? 0.88 : 1,
+      scale,
     };
   }
 
@@ -232,9 +246,16 @@ export class BattleScene extends Phaser.Scene {
     this.p2Sprite.setPosition(characterLayout.p2.x, characterLayout.p2.y);
     this.p2Sprite.setScale(-characterLayout.scale, characterLayout.scale);
 
-    const statusBaseY = height - (compact ? 160 : 205);
+    const smallLandscape = !isPortrait && height < 450;
+    let statusBaseY: number;
+    if (smallLandscape) {
+      // Place status text between characters and action buttons
+      statusBaseY = characterLayout.p1.y + characterLayout.scale * 82;
+    } else {
+      statusBaseY = height - (compact ? 160 : 205);
+    }
     this.currentPlayerLabel.setPosition(width / 2, statusBaseY);
-    this.messageText.setPosition(width / 2, statusBaseY + (isPortrait ? 52 : 46));
+    this.messageText.setPosition(width / 2, statusBaseY + (smallLandscape ? 24 : isPortrait ? 52 : 46));
     this.messageText.setWordWrapWidth(Math.max(220, width - 40), true);
 
     this.rebuildActionButtons(width, height);
@@ -246,6 +267,8 @@ export class BattleScene extends Phaser.Scene {
 
     this.actionPanel = drawActionBarPanel(this);
 
+    const isPortrait = height > width;
+    const smallLandscape = !isPortrait && height < 450;
     const compactButtons = width < 520;
     const sidePadding = compactButtons ? 14 : 28;
     const btnGap = compactButtons ? 10 : 24;
@@ -254,10 +277,19 @@ export class BattleScene extends Phaser.Scene {
       maxButtonWidth,
       Math.floor((width - sidePadding * 2 - btnGap * 2) / 3),
     );
-    const btnH = compactButtons
-      ? Phaser.Math.Clamp(Math.round(btnW * 0.72), 70, 82)
-      : 90;
-    const btnY = height - btnH / 2 - (compactButtons ? 18 : 26);
+    let btnH: number;
+    let bottomPad: number;
+    if (smallLandscape) {
+      btnH = Phaser.Math.Clamp(Math.round(height * 0.18), 52, 72);
+      bottomPad = 10;
+    } else if (compactButtons) {
+      btnH = Phaser.Math.Clamp(Math.round(btnW * 0.72), 70, 82);
+      bottomPad = 18;
+    } else {
+      btnH = 90;
+      bottomPad = 26;
+    }
+    const btnY = height - btnH / 2 - bottomPad;
     const totalBtnW = 3 * btnW + 2 * btnGap;
     const btnStartX = (width - totalBtnW) / 2 + btnW / 2;
     const onAction = (action: ActionType) => this.onPlayerAction(action);

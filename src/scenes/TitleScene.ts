@@ -2,12 +2,28 @@ import Phaser from 'phaser';
 import { UI_FONT_FAMILY } from '../ui/Typography';
 
 export class TitleScene extends Phaser.Scene {
+  private readonly handleResize = () => {
+    this.rebuildUI();
+  };
+
   constructor() {
     super({ key: 'TitleScene' });
   }
 
   create(): void {
+    this.rebuildUI();
+    this.scale.on('resize', this.handleResize);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off('resize', this.handleResize);
+    });
+  }
+
+  private rebuildUI(): void {
+    this.children.removeAll(true);
+    this.tweens.killAll();
+
     const { width, height } = this.scale;
+    const isLandscape = width > height && height < 500;
 
     // Gradient background
     const bg = this.add.graphics();
@@ -28,46 +44,87 @@ export class TitleScene extends Phaser.Scene {
       });
     }
 
-    // Title
-    const title = this.add.text(width / 2, height * 0.22, '⚔️ Pokémon Brawl ⚔️', {
-      fontFamily: UI_FONT_FAMILY,
-      fontSize: '52px',
-      color: '#f5d442',
-      stroke: '#000000',
-      strokeThickness: 8,
-      align: 'center',
-    }).setOrigin(0.5);
+    if (isLandscape) {
+      // Landscape: title top-center, buttons side-by-side
+      const titleSize = Phaser.Math.Clamp(Math.round(height * 0.13), 28, 44);
+      const title = this.add.text(width / 2, height * 0.2, '⚔️ Pokémon Brawl ⚔️', {
+        fontFamily: UI_FONT_FAMILY,
+        fontSize: `${titleSize}px`,
+        color: '#f5d442',
+        stroke: '#000000',
+        strokeThickness: 6,
+        align: 'center',
+      }).setOrigin(0.5);
 
-    // Title bounce
-    this.tweens.add({
-      targets: title,
-      y: title.y - 10,
-      duration: 1200,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
+      this.tweens.add({
+        targets: title,
+        y: title.y - 6,
+        duration: 1200,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
 
-    // Subtitle
-    this.add.text(width / 2, height * 0.36, 'Choose your fighter!', {
-      fontFamily: UI_FONT_FAMILY,
-      fontSize: '24px',
-      color: '#ffffff',
-      stroke: '#000000',
-      strokeThickness: 4,
-    }).setOrigin(0.5);
+      this.add.text(width / 2, height * 0.42, 'Choose your fighter!', {
+        fontFamily: UI_FONT_FAMILY,
+        fontSize: '20px',
+        color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 4,
+      }).setOrigin(0.5);
 
-    // --- PLAY button ---
-    this.createButton(width / 2, height * 0.55, 260, 80, '🎮  PLAY', 0x2ecc71, () => {
-      this.registry.set('mode', '1p');
-      this.scene.start('CharacterSelectScene');
-    });
+      // Side-by-side buttons
+      const btnW = Math.min(220, Math.floor(width * 0.24));
+      const btnH = Math.min(66, Math.round(height * 0.18));
+      const gap = 30;
 
-    // --- 2 PLAYER button ---
-    this.createButton(width / 2, height * 0.73, 260, 80, '👫  2 PLAYERS', 0x3498db, () => {
-      this.registry.set('mode', '2p');
-      this.scene.start('CharacterSelectScene');
-    });
+      this.createButton(width / 2 - btnW / 2 - gap / 2, height * 0.72, btnW, btnH, '🎮  PLAY', 0x2ecc71, () => {
+        this.registry.set('mode', '1p');
+        this.scene.start('CharacterSelectScene');
+      });
+
+      this.createButton(width / 2 + btnW / 2 + gap / 2, height * 0.72, btnW, btnH, '👫  2 PLAYERS', 0x3498db, () => {
+        this.registry.set('mode', '2p');
+        this.scene.start('CharacterSelectScene');
+      });
+    } else {
+      // Portrait layout
+      const title = this.add.text(width / 2, height * 0.22, '⚔️ Pokémon Brawl ⚔️', {
+        fontFamily: UI_FONT_FAMILY,
+        fontSize: '52px',
+        color: '#f5d442',
+        stroke: '#000000',
+        strokeThickness: 8,
+        align: 'center',
+      }).setOrigin(0.5);
+
+      this.tweens.add({
+        targets: title,
+        y: title.y - 10,
+        duration: 1200,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+
+      this.add.text(width / 2, height * 0.36, 'Choose your fighter!', {
+        fontFamily: UI_FONT_FAMILY,
+        fontSize: '24px',
+        color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 4,
+      }).setOrigin(0.5);
+
+      this.createButton(width / 2, height * 0.55, 260, 80, '🎮  PLAY', 0x2ecc71, () => {
+        this.registry.set('mode', '1p');
+        this.scene.start('CharacterSelectScene');
+      });
+
+      this.createButton(width / 2, height * 0.73, 260, 80, '👫  2 PLAYERS', 0x3498db, () => {
+        this.registry.set('mode', '2p');
+        this.scene.start('CharacterSelectScene');
+      });
+    }
   }
 
   private createButton(
