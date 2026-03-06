@@ -14,6 +14,9 @@ export class CharacterSelectScene extends Phaser.Scene {
   private pointerScrollActive = false;
   private dragStartY = 0;
   private dragStartOffset = 0;
+  private scrollVelocity = 0;
+  private lastPointerY = 0;
+  private lastMoveTime = 0;
   private scrollListeners: (() => void) | null = null;
   private readonly handleResize = () => {
     this.rebuildUI();
@@ -166,8 +169,11 @@ export class CharacterSelectScene extends Phaser.Scene {
       }
 
       this.pointerScrollActive = true;
+      this.scrollVelocity = 0;
       this.dragStartY = pointer.y;
       this.dragStartOffset = this.scrollOffset;
+      this.lastPointerY = pointer.y;
+      this.lastMoveTime = this.time.now;
     };
 
     const onPointerMove = (pointer: Phaser.Input.Pointer) => {
@@ -175,12 +181,22 @@ export class CharacterSelectScene extends Phaser.Scene {
         return;
       }
 
+      const now = this.time.now;
+      const dt = now - this.lastMoveTime;
+      if (dt > 0) {
+        // Track velocity in pixels per frame (~16ms)
+        this.scrollVelocity = (this.lastPointerY - pointer.y) / dt * 16;
+      }
+      this.lastPointerY = pointer.y;
+      this.lastMoveTime = now;
+
       const deltaY = pointer.y - this.dragStartY;
       this.setScrollOffset(this.dragStartOffset - deltaY);
     };
 
     const stopScroll = () => {
       this.pointerScrollActive = false;
+      // Momentum continues in update() via scrollVelocity
     };
 
     const onWheel = (
@@ -193,7 +209,8 @@ export class CharacterSelectScene extends Phaser.Scene {
         return;
       }
 
-      this.setScrollOffset(this.scrollOffset + deltaY * 0.8);
+      // Add velocity impulse for smooth wheel scrolling
+      this.scrollVelocity += deltaY * 0.4;
     };
 
     this.input.on('pointerdown', onPointerDown);
@@ -220,6 +237,16 @@ export class CharacterSelectScene extends Phaser.Scene {
       && x <= this.scale.width - 12
       && y >= this.scrollViewportTop
       && y <= this.scrollViewportTop + this.scrollViewportHeight;
+  }
+
+  update(_time: number, _delta: number): void {
+    if (this.pointerScrollActive || Math.abs(this.scrollVelocity) < 0.3) {
+      this.scrollVelocity = 0;
+      return;
+    }
+
+    this.setScrollOffset(this.scrollOffset + this.scrollVelocity);
+    this.scrollVelocity *= 0.93;
   }
 
   private setScrollOffset(offset: number): void {

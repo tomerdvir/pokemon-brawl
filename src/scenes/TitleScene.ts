@@ -65,7 +65,7 @@ export class TitleScene extends Phaser.Scene {
         ease: 'Sine.easeInOut',
       });
 
-      this.add.text(width / 2, height * 0.42, 'Choose your fighter!', {
+      this.add.text(width / 2, height * 0.42, 'Choose your battle mode!', {
         fontFamily: UI_FONT_FAMILY,
         fontSize: '20px',
         color: '#ffffff',
@@ -107,7 +107,7 @@ export class TitleScene extends Phaser.Scene {
         ease: 'Sine.easeInOut',
       });
 
-      this.add.text(width / 2, height * 0.36, 'Choose your fighter!', {
+      this.add.text(width / 2, height * 0.36, 'Choose your battle mode!', {
         fontFamily: UI_FONT_FAMILY,
         fontSize: '24px',
         color: '#ffffff',
