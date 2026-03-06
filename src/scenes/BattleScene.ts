@@ -788,9 +788,10 @@ export class BattleScene extends Phaser.Scene {
       ? (winner === 'p1' ? 'Player 1' : 'Player 2')
       : (winner === 'p1' ? 'You' : winnerChar.name);
 
+    const winVerb = this.mode !== '2p' && winner === 'p1' ? 'Win' : 'Wins';
     const emoji = winner === 'p1' || this.mode === '2p' ? '🏆' : '😢';
 
-    const winText = this.add.text(width / 2, height * 0.3, `${emoji} ${winnerLabel} Wins! ${emoji}`, {
+    const winText = this.add.text(width / 2, height * 0.3, `${emoji} ${winnerLabel} ${winVerb}! ${emoji}`, {
       fontFamily: UI_FONT_FAMILY,
       fontSize: '44px',
       color: '#f5d442',
