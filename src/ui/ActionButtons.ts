@@ -266,7 +266,7 @@ export class ActionButton {
 
 /* ── Action bar panel (drawn behind the buttons) ── */
 
-export function drawActionBarPanel(scene: Phaser.Scene): void {
+export function drawActionBarPanel(scene: Phaser.Scene): Phaser.GameObjects.Graphics {
   const { width, height } = scene.scale;
   const panelH = width < 520 ? 96 : 130;
   const panelY = height - panelH;
@@ -283,6 +283,8 @@ export function drawActionBarPanel(scene: Phaser.Scene): void {
   const diaY = panelY + 16;
   drawDiamond(g, 44, diaY, 5, 0xffffff, 0.15);
   drawDiamond(g, width - 44, diaY, 5, 0xffffff, 0.15);
+
+  return g;
 }
 
 function drawDiamond(g: Phaser.GameObjects.Graphics, cx: number, cy: number, size: number, color: number, alpha: number): void {

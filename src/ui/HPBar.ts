@@ -16,6 +16,7 @@ export class HPBar {
   private label: Phaser.GameObjects.Text;
   private hpText: Phaser.GameObjects.Text;
   private isShaking = false;
+  private labelAlign: 'left' | 'right';
 
   constructor(
     scene: Phaser.Scene,
@@ -25,6 +26,7 @@ export class HPBar {
     height: number,
     maxHP: number,
     name: string,
+    labelAlign: 'left' | 'right' = 'left',
   ) {
     this.x = x;
     this.y = y;
@@ -33,6 +35,7 @@ export class HPBar {
     this.maxHP = maxHP;
     this.currentHP = maxHP;
     this.scene = scene;
+    this.labelAlign = labelAlign;
 
     this.bar = scene.add.graphics();
     this.label = scene.add.text(x, y - 28, name, {
@@ -52,6 +55,17 @@ export class HPBar {
       strokeThickness: 3,
     }).setOrigin(0.5);
 
+    this.updateTextPositions();
+    this.draw();
+  }
+
+  setLayout(x: number, y: number, width: number, height: number, labelAlign = this.labelAlign): void {
+    this.x = x;
+    this.y = y;
+    this.width = width;
+    this.height = height;
+    this.labelAlign = labelAlign;
+    this.updateTextPositions();
     this.draw();
   }
 
@@ -138,6 +152,15 @@ export class HPBar {
     // Update numeric display
     const hpRound = Math.round(this.currentHP);
     this.hpText.setText(`${hpRound}/${this.maxHP}`);
+  }
+
+  private updateTextPositions(): void {
+    const labelX = this.labelAlign === 'right' ? this.x + this.width : this.x;
+    this.label
+      .setPosition(labelX, this.y - 28)
+      .setOrigin(this.labelAlign === 'right' ? 1 : 0, 0);
+
+    this.hpText.setPosition(this.x + this.width / 2, this.y + this.height / 2);
   }
 
   destroy(): void {

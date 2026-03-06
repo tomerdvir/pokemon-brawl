@@ -8,6 +8,7 @@ import { ActionButton, drawActionBarPanel } from '../ui/ActionButtons';
 import type { ActionType } from '../ui/ActionButtons';
 import { UI_FONT_FAMILY } from '../ui/Typography';
 import { randomBackground } from '../backgrounds/BackgroundConfig';
+import type { BattleBackground } from '../backgrounds/BackgroundConfig';
 import { drawMedievalArena } from '../backgrounds/ProceduralBackgrounds';
 import { spawnAttackEffect } from '../battle/AttackEffects';
 
@@ -24,12 +25,20 @@ export class BattleScene extends Phaser.Scene {
   private turnText!: Phaser.GameObjects.Text;
   private messageText!: Phaser.GameObjects.Text;
   private actionButtons: ActionButton[] = [];
+  private actionPanel?: Phaser.GameObjects.Graphics;
   private busy = false;
+  private backgroundChoice!: BattleBackground;
+  private backgroundImage?: Phaser.GameObjects.Image;
+  private backgroundOverlay?: Phaser.GameObjects.Graphics;
+  private arenaLine?: Phaser.GameObjects.Graphics;
 
   // 2P
   private waitingForP2 = false;
   private p1Action: ActionType | null = null;
   private currentPlayerLabel!: Phaser.GameObjects.Text;
+  private readonly handleResize = (gameSize: Phaser.Structs.Size) => {
+    this.layoutBattleScene(gameSize.width, gameSize.height);
+  };
 
   constructor() {
     super({ key: 'BattleScene' });
@@ -47,21 +56,24 @@ export class BattleScene extends Phaser.Scene {
 
     this.bm = new BattleManager(p1Char, p2Char);
     this.ai = new AIController();
+    this.backgroundChoice = randomBackground();
+
+    const characterLayout = this.getCharacterLayout(width, height);
 
     // -------- Background --------
     this.drawBackground(width, height);
 
     // -------- Character sprites (start offscreen for entrance) --------
-    this.p1Sprite = this.createCharacterSprite(width * 0.25, height * 0.42, p1Char, false);
-    this.p2Sprite = this.createCharacterSprite(width * 0.75, height * 0.42, p2Char, true);
+    this.p1Sprite = this.createCharacterSprite(characterLayout.p1.x, characterLayout.p1.y, p1Char, false);
+    this.p2Sprite = this.createCharacterSprite(characterLayout.p2.x, characterLayout.p2.y, p2Char, true);
 
     // Entrance animations — drop in from above
-    this.playEntranceAnimation(this.p1Sprite, width * 0.25, height * 0.42, false);
-    this.playEntranceAnimation(this.p2Sprite, width * 0.75, height * 0.42, true, 150);
+    this.playEntranceAnimation(this.p1Sprite, characterLayout.p1.x, characterLayout.p1.y, false, 0, characterLayout.scale);
+    this.playEntranceAnimation(this.p2Sprite, characterLayout.p2.x, characterLayout.p2.y, true, 150, characterLayout.scale);
 
     // -------- HP Bars --------
-    this.p1HPBar = new HPBar(this, 40, 30, 200, 22, p1Char.hp, `${p1Char.emoji} ${p1Char.name}`);
-    this.p2HPBar = new HPBar(this, width - 240, 30, 200, 22, p2Char.hp, `${p2Char.emoji} ${p2Char.name}`);
+    this.p1HPBar = new HPBar(this, 40, 30, 200, 22, p1Char.hp, `${p1Char.emoji} ${p1Char.name}`, 'left');
+    this.p2HPBar = new HPBar(this, width - 240, 30, 200, 22, p2Char.hp, `${p2Char.emoji} ${p2Char.name}`, 'right');
 
     // -------- Turn indicator --------
     this.turnText = this.add.text(width / 2, 38, 'Turn 1', {
@@ -92,9 +104,129 @@ export class BattleScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // -------- Action bar panel --------
-    drawActionBarPanel(this);
+    this.layoutBattleScene(width, height);
+    this.updateButtonStates();
 
-    // -------- Action buttons --------
+    this.scale.on('resize', this.handleResize);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off('resize', this.handleResize);
+    });
+
+
+  }
+
+  /* ============ BACKGROUND ============ */
+
+  private drawBackground(width: number, height: number): void {
+    const bg = this.backgroundChoice;
+
+    if (bg.procedural) {
+      // Procedural medieval arena
+      drawMedievalArena(this);
+    } else {
+      // Image background — scale to cover the full canvas
+      const img = this.add.image(width / 2, height / 2, bg.key);
+      img.setDisplaySize(width, height);
+      this.backgroundImage = img;
+
+      if (bg.tint !== undefined) {
+        img.setTint(bg.tint);
+      }
+
+      // Slight darkening overlay so UI stays readable
+      this.backgroundOverlay = this.add.graphics();
+      this.backgroundOverlay.fillStyle(0x000000, 0.25);
+      this.backgroundOverlay.fillRect(0, 0, width, height);
+    }
+
+    // Arena circle (subtle, on top of any background)
+    this.arenaLine = this.add.graphics();
+    this.redrawStaticBackground(width, height);
+  }
+
+  private redrawStaticBackground(width: number, height: number): void {
+    this.backgroundImage?.setPosition(width / 2, height / 2).setDisplaySize(width, height);
+
+    if (this.backgroundOverlay) {
+      this.backgroundOverlay.clear();
+      this.backgroundOverlay.fillStyle(0x000000, 0.25);
+      this.backgroundOverlay.fillRect(0, 0, width, height);
+    }
+
+    if (this.arenaLine) {
+      this.arenaLine.clear();
+      this.arenaLine.lineStyle(2, 0xffffff, 0.12);
+      this.arenaLine.strokeCircle(width / 2, height * 0.5, Math.min(width, height) * 0.22);
+    }
+  }
+
+  private getCharacterLayout(width: number, height: number): {
+    p1: { x: number; y: number };
+    p2: { x: number; y: number };
+    scale: number;
+  } {
+    const isPortrait = height > width;
+    const compact = width < 520;
+    const panelHeight = compact ? 96 : 130;
+    const arenaTop = isPortrait ? 220 : 132;
+    const arenaBottom = height - panelHeight - (isPortrait ? 118 : 98);
+    const fallbackCenterY = height * (isPortrait ? 0.48 : 0.44);
+    const centerY = arenaBottom > arenaTop
+      ? (arenaTop + arenaBottom) / 2
+      : fallbackCenterY;
+
+    return {
+      p1: { x: width * (isPortrait ? 0.28 : 0.25), y: centerY },
+      p2: { x: width * (isPortrait ? 0.72 : 0.75), y: centerY },
+      scale: isPortrait ? 0.88 : 1,
+    };
+  }
+
+  private layoutBattleScene(width: number, height: number): void {
+    const isPortrait = height > width;
+    const compact = width < 520;
+    const hpHeight = compact ? 20 : 22;
+    const sideMargin = compact ? 16 : 28;
+    const portraitBarWidth = Math.min(width - sideMargin * 2, 320);
+    const landscapeBarWidth = Phaser.Math.Clamp(Math.floor(width * 0.24), 180, 280);
+    const hpY = compact ? 24 : 30;
+    const secondBarY = hpY + hpHeight + 42;
+    const characterLayout = this.getCharacterLayout(width, height);
+
+    if (!this.backgroundChoice.procedural) {
+      this.redrawStaticBackground(width, height);
+    }
+
+    if (isPortrait) {
+      const barX = Math.floor((width - portraitBarWidth) / 2);
+      this.p1HPBar.setLayout(barX, hpY, portraitBarWidth, hpHeight, 'left');
+      this.p2HPBar.setLayout(barX, secondBarY, portraitBarWidth, hpHeight, 'left');
+      this.turnText.setPosition(width / 2, secondBarY + hpHeight + 28);
+    } else {
+      this.p1HPBar.setLayout(sideMargin, hpY, landscapeBarWidth, hpHeight, 'left');
+      this.p2HPBar.setLayout(width - sideMargin - landscapeBarWidth, hpY, landscapeBarWidth, hpHeight, 'right');
+      this.turnText.setPosition(width / 2, hpY + hpHeight + 22);
+    }
+
+    this.p1Sprite.setPosition(characterLayout.p1.x, characterLayout.p1.y);
+    this.p1Sprite.setScale(characterLayout.scale, characterLayout.scale);
+    this.p2Sprite.setPosition(characterLayout.p2.x, characterLayout.p2.y);
+    this.p2Sprite.setScale(-characterLayout.scale, characterLayout.scale);
+
+    const statusBaseY = height - (compact ? 160 : 205);
+    this.currentPlayerLabel.setPosition(width / 2, statusBaseY);
+    this.messageText.setPosition(width / 2, statusBaseY + (isPortrait ? 52 : 46));
+    this.messageText.setWordWrapWidth(Math.max(220, width - 40), true);
+
+    this.rebuildActionButtons(width, height);
+  }
+
+  private rebuildActionButtons(width: number, height: number): void {
+    this.actionPanel?.destroy();
+    this.actionButtons.forEach((button) => button.destroy());
+
+    this.actionPanel = drawActionBarPanel(this);
+
     const compactButtons = width < 520;
     const sidePadding = compactButtons ? 14 : 28;
     const btnGap = compactButtons ? 10 : 24;
@@ -109,7 +241,6 @@ export class BattleScene extends Phaser.Scene {
     const btnY = height - btnH / 2 - (compactButtons ? 18 : 26);
     const totalBtnW = 3 * btnW + 2 * btnGap;
     const btnStartX = (width - totalBtnW) / 2 + btnW / 2;
-
     const onAction = (action: ActionType) => this.onPlayerAction(action);
 
     this.actionButtons = [
@@ -128,37 +259,9 @@ export class BattleScene extends Phaser.Scene {
     ];
 
     this.updateButtonStates();
-
-
-  }
-
-  /* ============ BACKGROUND ============ */
-
-  private drawBackground(width: number, height: number): void {
-    const bg = randomBackground();
-
-    if (bg.procedural) {
-      // Procedural medieval arena
-      drawMedievalArena(this);
-    } else {
-      // Image background — scale to cover the full canvas
-      const img = this.add.image(width / 2, height / 2, bg.key);
-      img.setDisplaySize(width, height);
-
-      if (bg.tint !== undefined) {
-        img.setTint(bg.tint);
-      }
-
-      // Slight darkening overlay so UI stays readable
-      const overlay = this.add.graphics();
-      overlay.fillStyle(0x000000, 0.25);
-      overlay.fillRect(0, 0, width, height);
+    if (this.busy) {
+      this.setButtonsEnabled(false);
     }
-
-    // Arena circle (subtle, on top of any background)
-    const arenaLine = this.add.graphics();
-    arenaLine.lineStyle(2, 0xffffff, 0.12);
-    arenaLine.strokeCircle(width / 2, height * 0.5, 180);
   }
 
   /* ============ CHARACTER SPRITE ============ */
@@ -397,19 +500,26 @@ export class BattleScene extends Phaser.Scene {
 
   /* ============ ENTRANCE ANIMATION ============ */
 
-  private playEntranceAnimation(sprite: Phaser.GameObjects.Container, targetX: number, targetY: number, flip = false, delay = 0): void {
+  private playEntranceAnimation(
+    sprite: Phaser.GameObjects.Container,
+    targetX: number,
+    targetY: number,
+    flip = false,
+    delay = 0,
+    finalScale = 1,
+  ): void {
     // Start above the screen
-    const finalScaleX = flip ? -1 : 1;
+    const finalScaleX = flip ? -finalScale : finalScale;
     sprite.setPosition(targetX, -120);
     sprite.setAlpha(0);
-    sprite.setScale(finalScaleX * 0.5, 0.5);
+    sprite.setScale(finalScaleX * 0.5, finalScale * 0.5);
 
     this.tweens.add({
       targets: sprite,
       y: targetY,
       alpha: 1,
       scaleX: finalScaleX,
-      scaleY: 1,
+      scaleY: finalScale,
       duration: 600,
       delay,
       ease: 'Back.easeOut',
