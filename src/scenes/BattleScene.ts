@@ -156,7 +156,8 @@ export class BattleScene extends Phaser.Scene {
     if (this.arenaLine) {
       this.arenaLine.clear();
       this.arenaLine.lineStyle(2, 0xffffff, 0.12);
-      this.arenaLine.strokeCircle(width / 2, height * 0.5, Math.min(width, height) * 0.22);
+      const charLayout = this.getCharacterLayout(width, height);
+      this.arenaLine.strokeCircle(width / 2, charLayout.p1.y, Math.min(width, height) * 0.22);
     }
   }
 
@@ -168,8 +169,26 @@ export class BattleScene extends Phaser.Scene {
     const isPortrait = height > width;
     const compact = width < 520;
     const panelHeight = compact ? 96 : 130;
-    const arenaTop = isPortrait ? 220 : 132;
-    const arenaBottom = height - panelHeight - (isPortrait ? 118 : 98);
+
+    let arenaTop: number;
+    let arenaBottom: number;
+
+    if (isPortrait) {
+      // Derive arenaTop from actual UI: HP bars + turn text
+      const hpY = compact ? 24 : 30;
+      const hpHeight = compact ? 20 : 22;
+      const secondBarY = hpY + hpHeight + 42;
+      const turnTextBottom = secondBarY + hpHeight + 28 + 24; // turn text y + font height
+      arenaTop = turnTextBottom + 12;
+
+      // Derive arenaBottom from status label position
+      const statusBaseY = height - (compact ? 160 : 205);
+      arenaBottom = statusBaseY - 12;
+    } else {
+      arenaTop = 132;
+      arenaBottom = height - panelHeight - 98;
+    }
+
     const fallbackCenterY = height * (isPortrait ? 0.48 : 0.44);
     const centerY = arenaBottom > arenaTop
       ? (arenaTop + arenaBottom) / 2
