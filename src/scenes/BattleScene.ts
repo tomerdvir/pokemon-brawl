@@ -33,6 +33,8 @@ export class BattleScene extends Phaser.Scene {
   private arenaLine?: Phaser.GameObjects.Graphics;
   private p1IdleTween?: Phaser.Tweens.Tween;
   private p2IdleTween?: Phaser.Tweens.Tween;
+  private p1EntranceTween?: Phaser.Tweens.Tween;
+  private p2EntranceTween?: Phaser.Tweens.Tween;
 
   // 2P
   private waitingForP2 = false;
@@ -250,19 +252,26 @@ export class BattleScene extends Phaser.Scene {
       this.turnText.setPosition(width / 2, hpY + hpHeight + 22);
     }
 
-    // Stop old idle bobs before repositioning
+    // Stop entrance + idle tweens before repositioning
+    this.p1EntranceTween?.stop();
+    this.p2EntranceTween?.stop();
+    this.p1EntranceTween = undefined;
+    this.p2EntranceTween = undefined;
     this.p1IdleTween?.stop();
     this.p2IdleTween?.stop();
 
     this.p1Sprite.setPosition(characterLayout.p1.x, characterLayout.p1.y);
+    this.p1Sprite.setAlpha(1);
     this.p1Sprite.setScale(characterLayout.scale, characterLayout.scale);
     this.p2Sprite.setPosition(characterLayout.p2.x, characterLayout.p2.y);
+    this.p2Sprite.setAlpha(1);
     this.p2Sprite.setScale(-characterLayout.scale, characterLayout.scale);
 
-    // Restart idle bobs at the new positions
+    // Restart idle bobs at the new positions (scale amplitude with character scale)
+    const bobAmount = Math.round(6 * characterLayout.scale);
     this.p1IdleTween = this.tweens.add({
       targets: this.p1Sprite,
-      y: characterLayout.p1.y - 6,
+      y: characterLayout.p1.y - bobAmount,
       duration: 1200,
       yoyo: true,
       repeat: -1,
@@ -270,7 +279,7 @@ export class BattleScene extends Phaser.Scene {
     });
     this.p2IdleTween = this.tweens.add({
       targets: this.p2Sprite,
-      y: characterLayout.p2.y - 6,
+      y: characterLayout.p2.y - bobAmount,
       duration: 1200,
       yoyo: true,
       repeat: -1,
@@ -598,7 +607,7 @@ export class BattleScene extends Phaser.Scene {
     sprite.setAlpha(0);
     sprite.setScale(finalScaleX * 0.5, finalScale * 0.5);
 
-    this.tweens.add({
+    const entranceTween = this.tweens.add({
       targets: sprite,
       y: targetY,
       alpha: 1,
@@ -608,12 +617,16 @@ export class BattleScene extends Phaser.Scene {
       delay,
       ease: 'Back.easeOut',
       onComplete: () => {
+        // Clear entrance reference now that it finished naturally
+        if (sprite === this.p1Sprite) this.p1EntranceTween = undefined;
+        if (sprite === this.p2Sprite) this.p2EntranceTween = undefined;
         // Landing dust puff
         this.spawnLandingDust(targetX, targetY + 60);
         // Start idle bob after landing
+        const bobAmount = Math.round(6 * finalScale);
         const idleTween = this.tweens.add({
           targets: sprite,
-          y: targetY - 6,
+          y: targetY - bobAmount,
           duration: 1200,
           yoyo: true,
           repeat: -1,
@@ -624,6 +637,9 @@ export class BattleScene extends Phaser.Scene {
         if (sprite === this.p2Sprite) this.p2IdleTween = idleTween;
       },
     });
+    // Track so resize can kill it before it completes
+    if (sprite === this.p1Sprite) this.p1EntranceTween = entranceTween;
+    if (sprite === this.p2Sprite) this.p2EntranceTween = entranceTween;
   }
 
   private spawnLandingDust(x: number, y: number): void {
