@@ -1,4 +1,5 @@
 import type { CharacterDef } from '../characters/CharacterData';
+import { getTypeMultiplier } from '../characters/CharacterData';
 import type { ActionType } from '../ui/ActionButtons';
 
 export interface BattleState {
@@ -12,6 +13,7 @@ export interface FighterState {
   def: CharacterDef;
   hp: number;
   specialCooldown: number;
+  itemUses: number;
 }
 
 export interface TurnResult {
@@ -20,17 +22,22 @@ export interface TurnResult {
   damage: number;
   defenderHP: number;
   isKO: boolean;
+  /** Non-zero when the attacker used an item to heal */
+  healAmount: number;
+  typeMultiplier: number;
 }
 
 const SPECIAL_COOLDOWN = 3;
+const MAX_ITEM_USES = 2;
+const ITEM_HEAL = 20;
 
 export class BattleManager {
   state: BattleState;
 
   constructor(p1Def: CharacterDef, p2Def: CharacterDef) {
     this.state = {
-      p1: { def: p1Def, hp: p1Def.hp, specialCooldown: 0 },
-      p2: { def: p2Def, hp: p2Def.hp, specialCooldown: 0 },
+      p1: { def: p1Def, hp: p1Def.hp, specialCooldown: 0, itemUses: MAX_ITEM_USES },
+      p2: { def: p2Def, hp: p2Def.hp, specialCooldown: 0, itemUses: MAX_ITEM_USES },
       turn: 1,
       winner: null,
     };
@@ -44,25 +51,37 @@ export class BattleManager {
     const defender = this.state[who === 'p1' ? 'p2' : 'p1'];
 
     let damage = 0;
+    let healAmount = 0;
+    let typeMultiplier = 1;
 
     switch (action) {
       case 'attack': {
         const variance = Math.floor(Math.random() * 5);
-        damage = attacker.def.attackPower + variance;
+        const raw = attacker.def.attackPower + variance;
+        typeMultiplier = getTypeMultiplier(attacker.def.type, defender.def.type);
+        damage = Math.max(1, Math.round(raw * typeMultiplier) - Math.floor(defender.def.defense / 2));
         break;
       }
       case 'special': {
         const variance = Math.floor(Math.random() * 6);
-        damage = attacker.def.specialPower + variance;
+        const raw = attacker.def.specialPower + variance;
+        typeMultiplier = getTypeMultiplier(attacker.def.type, defender.def.type);
+        damage = Math.max(1, Math.round(raw * typeMultiplier) - Math.floor(defender.def.defense / 3));
         attacker.specialCooldown = SPECIAL_COOLDOWN;
         break;
       }
       case 'defend': {
-        // Defending heals a small amount and will halve incoming damage on the other side.
-        // The "halve incoming" is handled by the caller pairing actions.
         damage = 0;
-        // Small self-heal
         attacker.hp = Math.min(attacker.def.hp, attacker.hp + 5);
+        break;
+      }
+      case 'item': {
+        damage = 0;
+        attacker.itemUses--;
+        const heal = ITEM_HEAL;
+        const before = attacker.hp;
+        attacker.hp = Math.min(attacker.def.hp, attacker.hp + heal);
+        healAmount = attacker.hp - before;
         break;
       }
     }
@@ -81,6 +100,8 @@ export class BattleManager {
       damage,
       defenderHP: defender.hp,
       isKO,
+      healAmount,
+      typeMultiplier,
     };
   }
 
@@ -91,16 +112,5 @@ export class BattleManager {
     if (this.state.p1.specialCooldown > 0) this.state.p1.specialCooldown--;
     if (this.state.p2.specialCooldown > 0) this.state.p2.specialCooldown--;
     this.state.turn++;
-  }
-
-  /** When a defender chose "defend", halve the incoming damage from the paired attack. */
-  static applyDefendModifier(result: TurnResult, defenderAction: ActionType): TurnResult {
-    if (defenderAction === 'defend' && result.damage > 0) {
-      const reduced = Math.floor(result.damage / 2);
-      result.damage = reduced;
-      // recompute defender HP — the original was already applied, so we heal back the diff
-      result.defenderHP += (result.damage); // half was already subtracted, add it back
-    }
-    return result;
   }
 }

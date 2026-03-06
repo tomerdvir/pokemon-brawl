@@ -35,6 +35,8 @@ export class BattleScene extends Phaser.Scene {
   private p2IdleTween?: Phaser.Tweens.Tween;
   private p1EntranceTween?: Phaser.Tweens.Tween;
   private p2EntranceTween?: Phaser.Tweens.Tween;
+  private p1AuraTimer?: Phaser.Time.TimerEvent;
+  private p2AuraTimer?: Phaser.Time.TimerEvent;
 
   // 2P
   private waitingForP2 = false;
@@ -118,9 +120,14 @@ export class BattleScene extends Phaser.Scene {
     this.layoutBattleScene(width, height);
     this.updateButtonStates();
 
+    // -------- Character aura particles --------
+    this.startCharacterAuras();
+
     this.scale.on('resize', this.handleResize);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off('resize', this.handleResize);
+      this.p1AuraTimer?.destroy();
+      this.p2AuraTimer?.destroy();
     });
 
 
@@ -308,15 +315,16 @@ export class BattleScene extends Phaser.Scene {
     this.actionPanel = drawActionBarPanel(this);
     this.actionPanel.setDepth(15);
 
+    const NUM_BTNS = 4;
     const isPortrait = height > width;
     const smallLandscape = !isPortrait && height < 450;
     const compactButtons = width < 520;
-    const sidePadding = compactButtons ? 14 : 28;
-    const btnGap = compactButtons ? 10 : 24;
-    const maxButtonWidth = compactButtons ? 116 : 150;
+    const sidePadding = compactButtons ? 10 : 24;
+    const btnGap = compactButtons ? 8 : 18;
+    const maxButtonWidth = compactButtons ? 100 : 130;
     const btnW = Math.min(
       maxButtonWidth,
-      Math.floor((width - sidePadding * 2 - btnGap * 2) / 3),
+      Math.floor((width - sidePadding * 2 - btnGap * (NUM_BTNS - 1)) / NUM_BTNS),
     );
     let btnH: number;
     let bottomPad: number;
@@ -331,7 +339,7 @@ export class BattleScene extends Phaser.Scene {
       bottomPad = 26;
     }
     const btnY = height - btnH / 2 - bottomPad;
-    const totalBtnW = 3 * btnW + 2 * btnGap;
+    const totalBtnW = NUM_BTNS * btnW + (NUM_BTNS - 1) * btnGap;
     const btnStartX = (width - totalBtnW) / 2 + btnW / 2;
     const onAction = (action: ActionType) => this.onPlayerAction(action);
 
@@ -347,6 +355,10 @@ export class BattleScene extends Phaser.Scene {
       new ActionButton(this, {
         x: btnStartX + 2 * (btnW + btnGap), y: btnY, width: btnW, height: btnH,
         label: 'Defend', emoji: '🛡️', color: 0x27ae60, action: 'defend', onPress: onAction,
+      }),
+      new ActionButton(this, {
+        x: btnStartX + 3 * (btnW + btnGap), y: btnY, width: btnW, height: btnH,
+        label: 'Item', emoji: '🧪', color: 0xe67e22, action: 'item', onPress: onAction,
       }),
     ];
     this.actionButtons.forEach((b) => b.setDepth(15));
@@ -406,7 +418,8 @@ export class BattleScene extends Phaser.Scene {
   /* ============ 1P TURN ============ */
 
   private async executeTurn1P(playerAction: ActionType): Promise<void> {
-    const aiAction = this.ai.pickAction(this.bm.state.p2.specialCooldown);
+    const p2 = this.bm.state.p2;
+    const aiAction = this.ai.pickAction(p2.specialCooldown, p2.hp, p2.def.hp, p2.itemUses);
 
     // Player attacks
     const p1Result = this.bm.executeAction('p1', playerAction);
@@ -499,7 +512,15 @@ export class BattleScene extends Phaser.Scene {
       : (this.registry.get('p2Char') as CharacterDef);
     const attackerName = attackerChar.name;
 
-    if (action === 'defend') {
+    if (action === 'item') {
+      this.messageText.setText(`${attackerName} uses a Potion! +${result.healAmount} HP 💚`);
+      // Heal sparkle on the attacker
+      this.spawnHealEffect(attackerSprite.x, attackerSprite.y);
+      const attackerBar = result.attacker === 'p1' ? this.p1HPBar : this.p2HPBar;
+      const attackerHP = result.attacker === 'p1' ? this.bm.state.p1.hp : this.bm.state.p2.hp;
+      await attackerBar.animateHP(this, attackerHP);
+      await this.wait(500);
+    } else if (action === 'defend') {
       this.messageText.setText(`${attackerName} defends! 🛡️`);
       await this.flashSprite(attackerSprite, 0x27ae60);
       await this.wait(400);
@@ -507,7 +528,10 @@ export class BattleScene extends Phaser.Scene {
       const label = action === 'special'
         ? attackerChar.specialName
         : 'ATTACK';
-      this.messageText.setText(`${attackerName} uses ${label}! -${result.damage} HP`);
+      let effectivenessTag = '';
+      if (result.typeMultiplier > 1) effectivenessTag = ' 💥 Super effective!';
+      else if (result.typeMultiplier < 1) effectivenessTag = ' 🔻 Not very effective...';
+      this.messageText.setText(`${attackerName} uses ${label}! -${result.damage} HP${effectivenessTag}`);
 
       // Lunge forward
       const dir = result.attacker === 'p1' ? 1 : -1;
@@ -665,6 +689,137 @@ export class BattleScene extends Phaser.Scene {
     return new Promise((resolve) => this.time.delayedCall(ms, resolve));
   }
 
+  /* ============ HEAL EFFECT ============ */
+
+  private spawnHealEffect(x: number, y: number): void {
+    for (let i = 0; i < 10; i++) {
+      const sparkle = this.add.circle(
+        x + Phaser.Math.Between(-30, 30),
+        y + Phaser.Math.Between(20, 60),
+        Phaser.Math.Between(3, 6),
+        Phaser.Utils.Array.GetRandom([0x2ecc71, 0x27ae60, 0x00ff88, 0xaaffaa]),
+        0.9,
+      ).setDepth(55);
+      this.tweens.add({
+        targets: sparkle,
+        y: sparkle.y - Phaser.Math.Between(60, 120),
+        alpha: 0,
+        scale: 0.2,
+        duration: Phaser.Math.Between(600, 1000),
+        delay: i * 60,
+        onComplete: () => sparkle.destroy(),
+      });
+    }
+    // Green glow ring
+    const ring = this.add.circle(x, y, 15, 0x2ecc71, 0).setDepth(54);
+    ring.setStrokeStyle(3, 0x2ecc71, 0.7);
+    this.tweens.add({
+      targets: ring, scale: 4, alpha: 0, duration: 600,
+      onComplete: () => ring.destroy(),
+    });
+  }
+
+  /* ============ CHARACTER AURA / IDLE PARTICLES ============ */
+
+  private startCharacterAuras(): void {
+    const p1Char = this.registry.get('p1Char') as CharacterDef;
+    const p2Char = this.registry.get('p2Char') as CharacterDef;
+
+    this.p1AuraTimer?.destroy();
+    this.p2AuraTimer?.destroy();
+
+    this.p1AuraTimer = this.time.addEvent({
+      delay: 400,
+      loop: true,
+      callback: () => this.spawnAuraParticle(this.p1Sprite, p1Char),
+    });
+    this.p2AuraTimer = this.time.addEvent({
+      delay: 400,
+      loop: true,
+      callback: () => this.spawnAuraParticle(this.p2Sprite, p2Char),
+    });
+  }
+
+  private spawnAuraParticle(sprite: Phaser.GameObjects.Container, charDef: CharacterDef): void {
+    const x = sprite.x + Phaser.Math.Between(-25, 25);
+    const y = sprite.y + Phaser.Math.Between(-20, 30);
+
+    switch (charDef.type) {
+      case 'electric': {
+        // Tiny spark
+        const g = this.add.graphics().setDepth(4);
+        g.lineStyle(1.5, 0xffff44, 0.7);
+        g.beginPath();
+        g.moveTo(x, y);
+        g.lineTo(x + Phaser.Math.Between(-6, 6), y + Phaser.Math.Between(-8, 8));
+        g.strokePath();
+        this.tweens.add({ targets: g, alpha: 0, duration: 300, onComplete: () => g.destroy() });
+        break;
+      }
+      case 'fire': {
+        const size = Phaser.Math.Between(3, 7);
+        const flame = this.add.triangle(
+          x, y, 0, size, size / 2, -size, -size / 2, -size,
+          Phaser.Utils.Array.GetRandom([0xff4500, 0xff6a00, 0xffaa00]), 0.5,
+        ).setDepth(4).setAngle(Phaser.Math.Between(0, 360));
+        this.tweens.add({
+          targets: flame, y: flame.y - Phaser.Math.Between(15, 30), alpha: 0, scale: 0.2,
+          duration: Phaser.Math.Between(400, 700), onComplete: () => flame.destroy(),
+        });
+        break;
+      }
+      case 'water': {
+        const bubble = this.add.circle(x, y, Phaser.Math.Between(2, 4),
+          Phaser.Utils.Array.GetRandom([0x42a5f5, 0x90caf9]), 0.4).setDepth(4);
+        this.tweens.add({
+          targets: bubble, y: bubble.y - 20, alpha: 0, scale: 1.5,
+          duration: 500, onComplete: () => bubble.destroy(),
+        });
+        break;
+      }
+      case 'grass': {
+        const leaf = this.add.ellipse(x, y, 3, 7,
+          Phaser.Utils.Array.GetRandom([0x4caf50, 0x81c784]), 0.5).setDepth(4);
+        leaf.setAngle(Phaser.Math.Between(0, 360));
+        this.tweens.add({
+          targets: leaf,
+          x: leaf.x + Phaser.Math.Between(-15, 15),
+          y: leaf.y - Phaser.Math.Between(10, 25),
+          alpha: 0, angle: leaf.angle + 90,
+          duration: 600, onComplete: () => leaf.destroy(),
+        });
+        break;
+      }
+      case 'fairy': {
+        const star = this.add.star(x, y, 4, 1, 3,
+          Phaser.Utils.Array.GetRandom([0xff69b4, 0xffb6c1, 0xda70d6]), 0.5).setDepth(4);
+        this.tweens.add({
+          targets: star, y: star.y - 15, alpha: 0, angle: 45, scale: 0.3,
+          duration: 500, onComplete: () => star.destroy(),
+        });
+        break;
+      }
+      case 'psychic': {
+        const ring = this.add.circle(x, y, 2, 0x9b59b6, 0).setDepth(4);
+        ring.setStrokeStyle(1, Phaser.Utils.Array.GetRandom([0x9b59b6, 0xbb6bd9, 0xd4a5ff]), 0.4);
+        this.tweens.add({
+          targets: ring, scale: 3, alpha: 0, duration: 500,
+          onComplete: () => ring.destroy(),
+        });
+        break;
+      }
+      default: {
+        // Normal type — subtle shimmer
+        const dot = this.add.circle(x, y, 2, 0xffffff, 0.3).setDepth(4);
+        this.tweens.add({
+          targets: dot, alpha: 0, scale: 2, duration: 400,
+          onComplete: () => dot.destroy(),
+        });
+        break;
+      }
+    }
+  }
+
   /* ============ FLOATING DAMAGE NUMBER ============ */
 
   private spawnDamageNumber(x: number, y: number, damage: number, isSpecial: boolean): void {
@@ -722,9 +877,16 @@ export class BattleScene extends Phaser.Scene {
     specialBtn.showCooldown(fighter.specialCooldown);
     specialBtn.setEnabled(fighter.specialCooldown <= 0);
 
-    // Others always enabled
+    // Attack and Defend always enabled
     this.actionButtons[0].setEnabled(true);
     this.actionButtons[2].setEnabled(true);
+
+    // Item button is index 3
+    const itemBtn = this.actionButtons[3];
+    if (itemBtn) {
+      itemBtn.showCooldown(fighter.itemUses <= 0 ? 1 : 0);
+      itemBtn.setEnabled(fighter.itemUses > 0);
+    }
   }
 
   /* ============ PASS OVERLAY (2P) ============ */

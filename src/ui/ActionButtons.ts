@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { UI_FONT_FAMILY } from './Typography';
 
-export type ActionType = 'attack' | 'special' | 'defend';
+export type ActionType = 'attack' | 'special' | 'defend' | 'item';
 
 export interface ActionButtonConfig {
   x: number;

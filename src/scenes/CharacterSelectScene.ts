@@ -282,13 +282,26 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.cardContainer.add(nameText);
 
     // Stats preview
-    const statsText = this.add.text(x, y + h * 0.3, `HP ${charDef.hp}   ⚔ ${charDef.attackPower}   ✨ ${charDef.specialPower}`, {
+    const statsText = this.add.text(x, y + h * 0.3, `HP ${charDef.hp}  ⚔${charDef.attackPower}  🛡${charDef.defense}  ✨${charDef.specialPower}`, {
       fontFamily: UI_FONT_FAMILY,
-      fontSize: w < 150 ? '12px' : '13px',
+      fontSize: w < 150 ? '11px' : '12px',
       color: '#aaaacc',
       align: 'center',
     }).setOrigin(0.5);
     this.cardContainer.add(statsText);
+
+    // Type badge
+    const TYPE_LABELS: Record<string, string> = {
+      electric: '⚡ Electric', fire: '🔥 Fire', grass: '🌿 Grass',
+      water: '💧 Water', normal: '⭐ Normal', fairy: '🧚 Fairy', psychic: '🔮 Psychic',
+    };
+    const typeText = this.add.text(x, y + h * 0.42, TYPE_LABELS[charDef.type] ?? charDef.type, {
+      fontFamily: UI_FONT_FAMILY,
+      fontSize: w < 150 ? '10px' : '11px',
+      color: '#88aadd',
+      align: 'center',
+    }).setOrigin(0.5);
+    this.cardContainer.add(typeText);
 
     // Hit area
     const hitArea = this.add.rectangle(x, y, w, h)
@@ -304,7 +317,7 @@ export class CharacterSelectScene extends Phaser.Scene {
 
       // Bounce
       this.tweens.add({
-        targets: [g, sprite, nameText, statsText],
+        targets: [g, sprite, nameText, statsText, typeText],
         scaleX: 0.93,
         scaleY: 0.93,
         duration: 80,
