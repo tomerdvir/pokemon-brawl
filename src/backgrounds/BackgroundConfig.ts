@@ -20,19 +20,33 @@ export interface BattleBackground {
 /** Master list of available battle backgrounds */
 export const BATTLE_BACKGROUNDS: BattleBackground[] = [
   {
-    key: 'bg_medieval_town_1',
-    path: 'assets/backgrounds/medieval_town_1.png',
-    label: 'Medieval Town',
-  },
-  {
-    key: 'bg_medieval_town_2',
-    path: 'assets/backgrounds/medieval_town_2.png',
-    label: 'Medieval Town (alt)',
-  },
-  {
     key: 'bg_medieval_arena',
     path: '',
     label: 'Medieval Arena',
+    procedural: true,
+  },
+  {
+    key: 'bg_enchanted_forest',
+    path: '',
+    label: 'Enchanted Forest',
+    procedural: true,
+  },
+  {
+    key: 'bg_volcanic_crater',
+    path: '',
+    label: 'Volcanic Crater',
+    procedural: true,
+  },
+  {
+    key: 'bg_frozen_peaks',
+    path: '',
+    label: 'Frozen Peaks',
+    procedural: true,
+  },
+  {
+    key: 'bg_ocean_cliffs',
+    path: '',
+    label: 'Ocean Cliffs',
     procedural: true,
   },
 ];

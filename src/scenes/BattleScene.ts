@@ -9,7 +9,7 @@ import type { ActionType } from '../ui/ActionButtons';
 import { UI_FONT_FAMILY } from '../ui/Typography';
 import { randomBackground } from '../backgrounds/BackgroundConfig';
 import type { BattleBackground } from '../backgrounds/BackgroundConfig';
-import { drawMedievalArena } from '../backgrounds/ProceduralBackgrounds';
+import { drawProceduralBackground } from '../backgrounds/ProceduralBackgrounds';
 import { spawnAttackEffect } from '../battle/AttackEffects';
 
 export class BattleScene extends Phaser.Scene {
@@ -139,8 +139,8 @@ export class BattleScene extends Phaser.Scene {
     const bg = this.backgroundChoice;
 
     if (bg.procedural) {
-      // Procedural medieval arena
-      drawMedievalArena(this);
+      // Procedural vector background
+      drawProceduralBackground(this, bg.key);
     } else {
       // Image background — scale to cover the full canvas
       const img = this.add.image(width / 2, height / 2, bg.key);
