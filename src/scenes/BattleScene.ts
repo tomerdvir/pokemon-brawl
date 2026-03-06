@@ -68,6 +68,8 @@ export class BattleScene extends Phaser.Scene {
     // -------- Character sprites (start offscreen for entrance) --------
     this.p1Sprite = this.createCharacterSprite(characterLayout.p1.x, characterLayout.p1.y, p1Char, false);
     this.p2Sprite = this.createCharacterSprite(characterLayout.p2.x, characterLayout.p2.y, p2Char, true);
+    this.p1Sprite.setDepth(5);
+    this.p2Sprite.setDepth(5);
 
     // Entrance animations — drop in from above
     this.playEntranceAnimation(this.p1Sprite, characterLayout.p1.x, characterLayout.p1.y, false, 0, characterLayout.scale);
@@ -76,6 +78,8 @@ export class BattleScene extends Phaser.Scene {
     // -------- HP Bars --------
     this.p1HPBar = new HPBar(this, 40, 30, 200, 22, p1Char.hp, `${p1Char.emoji} ${p1Char.name}`, 'left');
     this.p2HPBar = new HPBar(this, width - 240, 30, 200, 22, p2Char.hp, `${p2Char.emoji} ${p2Char.name}`, 'right');
+    this.p1HPBar.setDepth(10);
+    this.p2HPBar.setDepth(10);
 
     // -------- Turn indicator --------
     this.turnText = this.add.text(width / 2, 38, 'Turn 1', {
@@ -85,6 +89,7 @@ export class BattleScene extends Phaser.Scene {
       stroke: '#000',
       strokeThickness: 3,
     }).setOrigin(0.5);
+    this.turnText.setDepth(10);
 
     // -------- Current player label --------
     this.currentPlayerLabel = this.add.text(width / 2, height * 0.6, 'Your Turn!', {
@@ -94,6 +99,7 @@ export class BattleScene extends Phaser.Scene {
       stroke: '#000000',
       strokeThickness: 5,
     }).setOrigin(0.5);
+    this.currentPlayerLabel.setDepth(10);
 
     // -------- Message text --------
     this.messageText = this.add.text(width / 2, height * 0.67, '', {
@@ -104,6 +110,7 @@ export class BattleScene extends Phaser.Scene {
       strokeThickness: 4,
       align: 'center',
     }).setOrigin(0.5);
+    this.messageText.setDepth(10);
 
     // -------- Action bar panel --------
     this.layoutBattleScene(width, height);
@@ -290,6 +297,7 @@ export class BattleScene extends Phaser.Scene {
     this.actionButtons.forEach((button) => button.destroy());
 
     this.actionPanel = drawActionBarPanel(this);
+    this.actionPanel.setDepth(15);
 
     const isPortrait = height > width;
     const smallLandscape = !isPortrait && height < 450;
@@ -332,6 +340,7 @@ export class BattleScene extends Phaser.Scene {
         label: 'Defend', emoji: '🛡️', color: 0x27ae60, action: 'defend', onPress: onAction,
       }),
     ];
+    this.actionButtons.forEach((b) => b.setDepth(15));
 
     this.updateButtonStates();
     if (this.busy) {

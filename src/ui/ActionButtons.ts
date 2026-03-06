@@ -262,6 +262,11 @@ export class ActionButton {
     this.container.destroy();
     this.hitArea.destroy();
   }
+
+  setDepth(depth: number): void {
+    this.container.setDepth(depth);
+    this.hitArea.setDepth(depth);
+  }
 }
 
 /* ── Action bar panel (drawn behind the buttons) ── */

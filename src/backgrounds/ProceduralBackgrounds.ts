@@ -34,8 +34,10 @@ export function drawMedievalArena(scene: Phaser.Scene): void {
   const objs: Phaser.GameObjects.GameObject[] = [];
   const tweens: Phaser.Tweens.Tween[] = [];
 
+  const BG_DEPTH = -10;
+
   const gfx = (): Phaser.GameObjects.Graphics => {
-    const g = scene.add.graphics();
+    const g = scene.add.graphics().setDepth(BG_DEPTH);
     objs.push(g);
     return g;
   };
@@ -248,7 +250,7 @@ export function drawMedievalArena(scene: Phaser.Scene): void {
   for (let i = 0; i < 12; i++) {
     const fx = rng.between(Math.floor(W * 0.05), Math.floor(W * 0.95));
     const fy = rng.between(Math.floor(H * 0.35), Math.floor(H * 0.65));
-    const dot = scene.add.circle(fx, fy, rng.realInRange(1.5, 3), 0xffe566, 0.6);
+    const dot = scene.add.circle(fx, fy, rng.realInRange(1.5, 3), 0xffe566, 0.6).setDepth(BG_DEPTH);
     objs.push(dot);
     const t = scene.tweens.add({
       targets: dot,
@@ -331,7 +333,7 @@ function drawProceduralCloud(
   scale: number,
   alpha: number,
 ): void {
-  const g = scene.add.graphics();
+  const g = scene.add.graphics().setDepth(-10);
   objs.push(g);
   g.fillStyle(0xd8c8e8, alpha);
   g.fillEllipse(x, y, 80 * scale, 24 * scale);

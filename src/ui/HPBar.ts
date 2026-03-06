@@ -168,4 +168,10 @@ export class HPBar {
     this.label.destroy();
     this.hpText.destroy();
   }
+
+  setDepth(depth: number): void {
+    this.bar.setDepth(depth);
+    this.label.setDepth(depth);
+    this.hpText.setDepth(depth);
+  }
 }
