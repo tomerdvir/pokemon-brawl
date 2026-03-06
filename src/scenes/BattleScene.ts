@@ -31,6 +31,8 @@ export class BattleScene extends Phaser.Scene {
   private backgroundImage?: Phaser.GameObjects.Image;
   private backgroundOverlay?: Phaser.GameObjects.Graphics;
   private arenaLine?: Phaser.GameObjects.Graphics;
+  private p1IdleTween?: Phaser.Tweens.Tween;
+  private p2IdleTween?: Phaser.Tweens.Tween;
 
   // 2P
   private waitingForP2 = false;
@@ -187,8 +189,8 @@ export class BattleScene extends Phaser.Scene {
       arenaBottom = statusBaseY - 12;
     } else if (smallLandscape) {
       // Phone landscape: compact top, tight bottom
-      arenaTop = 62;
-      arenaBottom = height - panelHeight - 20;
+      arenaTop = 72;
+      arenaBottom = height - panelHeight - 10;
     } else {
       arenaTop = 132;
       arenaBottom = height - panelHeight - 98;
@@ -241,10 +243,32 @@ export class BattleScene extends Phaser.Scene {
       this.turnText.setPosition(width / 2, hpY + hpHeight + 22);
     }
 
+    // Stop old idle bobs before repositioning
+    this.p1IdleTween?.stop();
+    this.p2IdleTween?.stop();
+
     this.p1Sprite.setPosition(characterLayout.p1.x, characterLayout.p1.y);
     this.p1Sprite.setScale(characterLayout.scale, characterLayout.scale);
     this.p2Sprite.setPosition(characterLayout.p2.x, characterLayout.p2.y);
     this.p2Sprite.setScale(-characterLayout.scale, characterLayout.scale);
+
+    // Restart idle bobs at the new positions
+    this.p1IdleTween = this.tweens.add({
+      targets: this.p1Sprite,
+      y: characterLayout.p1.y - 6,
+      duration: 1200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+    this.p2IdleTween = this.tweens.add({
+      targets: this.p2Sprite,
+      y: characterLayout.p2.y - 6,
+      duration: 1200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
 
     const smallLandscape = !isPortrait && height < 450;
     let statusBaseY: number;
@@ -578,7 +602,7 @@ export class BattleScene extends Phaser.Scene {
         // Landing dust puff
         this.spawnLandingDust(targetX, targetY + 60);
         // Start idle bob after landing
-        this.tweens.add({
+        const idleTween = this.tweens.add({
           targets: sprite,
           y: targetY - 6,
           duration: 1200,
@@ -586,6 +610,9 @@ export class BattleScene extends Phaser.Scene {
           repeat: -1,
           ease: 'Sine.easeInOut',
         });
+        // Track so resize can stop/restart it
+        if (sprite === this.p1Sprite) this.p1IdleTween = idleTween;
+        if (sprite === this.p2Sprite) this.p2IdleTween = idleTween;
       },
     });
   }
